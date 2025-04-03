@@ -11,6 +11,12 @@ document.addEventListener('click', function(e){
     else if(e.target.dataset.reply){
         handleReplyClick(e.target.dataset.reply)
     }
+    else if(e.target.dataset.replyTo){
+        handleReplyBtnClick(e.target.dataset.replyTo)
+    }
+    else if(e.target.dataset.replyLike){
+        handleReplyLikeClick(e.target.dataset.replyLike, e.target.dataset.tweetId)
+    }
     else if(e.target.id === 'tweet-btn'){
         handleTweetBtnClick()
     }
@@ -47,7 +53,97 @@ function handleRetweetClick(tweetId){
 }
 
 function handleReplyClick(replyId){
-    document.getElementById(`replies-${replyId}`).classList.toggle('hidden')
+    const repliesDiv = document.getElementById(`replies-${replyId}`)
+    repliesDiv.classList.toggle('hidden')
+    
+    // Add reply input if it doesn't exist
+    if (!document.getElementById(`reply-input-${replyId}`)) {
+        const replyInputHtml = `
+            <div class="tweet-input-area reply-input">
+                <img src="images/goldenpuppy.png" class="profile-pic">
+                <textarea placeholder="Tweet your reply" id="reply-input-${replyId}"></textarea>
+            </div>
+            <button class="reply-btn" data-reply-to="${replyId}">Reply</button>
+        `
+        repliesDiv.insertAdjacentHTML('afterbegin', replyInputHtml)
+    }
+}
+
+function handleReplyBtnClick(replyToId) {
+    const replyInput = document.getElementById(`reply-input-${replyToId}`)
+    const replyText = replyInput.value.trim()
+
+    if (replyText) {
+        const targetTweet = tweetsData.find(tweet => tweet.uuid === replyToId)
+        if (targetTweet) {
+            const newReply = {
+                handle: `@GoldenMaple`,
+                profilePic: `images/goldenpuppy.png`,
+                tweetText: replyText,
+                likes: 0,
+                isLiked: false,
+                uuid: uuidv4()
+            }
+            targetTweet.replies.unshift(newReply)
+            
+            // Clear the input
+            replyInput.value = ''
+            
+            // Add the new reply to the UI without re-rendering
+            const repliesDiv = document.getElementById(`replies-${replyToId}`)
+            const newReplyHtml = `
+<div class="tweet-reply">
+    <div class="tweet-inner">
+        <img src="${newReply.profilePic}" class="profile-pic">
+            <div>
+                <p class="handle">${newReply.handle}</p>
+                <p class="tweet-text">${newReply.tweetText}</p>
+                <div class="tweet-details">
+                    <span class="tweet-detail">
+                        <i class="fa-solid fa-heart"
+                        data-reply-like="${newReply.uuid}"
+                        data-tweet-id="${replyToId}"
+                        ></i>
+                        ${newReply.likes}
+                    </span>
+                </div>
+            </div>
+        </div>
+</div>
+`
+            // Insert the new reply after the reply input area
+            const replyInputArea = document.querySelector(`.reply-input`)
+            replyInputArea.insertAdjacentHTML('afterend', newReplyHtml)
+            
+            // Update the reply count in the tweet
+            const replyCount = document.querySelector(`[data-reply="${replyToId}"]`).nextSibling
+            replyCount.textContent = targetTweet.replies.length
+        }
+    }
+}
+
+function handleReplyLikeClick(replyId, tweetId) {
+    const targetTweet = tweetsData.find(tweet => tweet.uuid === tweetId)
+    if (targetTweet) {
+        const targetReply = targetTweet.replies.find(reply => reply.uuid === replyId)
+        if (targetReply) {
+            if (targetReply.isLiked) {
+                targetReply.likes--
+            } else {
+                targetReply.likes++
+            }
+            targetReply.isLiked = !targetReply.isLiked
+            
+            // Update only the reply's like count and icon
+            const likeIcon = document.querySelector(`[data-reply-like="${replyId}"]`)
+            const likeCount = likeIcon.nextSibling
+            
+            if (likeIcon) {
+                likeIcon.classList.toggle('liked')
+                likeCount.textContent = targetReply.likes
+            }
+        }
+    }
 }
 
 function handleTweetBtnClick(){
@@ -92,6 +188,7 @@ function getFeedHtml(){
         
         if(tweet.replies.length > 0){
             tweet.replies.forEach(function(reply){
+                const likeIconClass = reply.isLiked ? 'liked' : ''
                 repliesHtml+=`
 <div class="tweet-reply">
     <div class="tweet-inner">
@@ -99,6 +196,15 @@ function getFeedHtml(){
             <div>
                 <p class="handle">${reply.handle}</p>
                 <p class="tweet-text">${reply.tweetText}</p>
+                <div class="tweet-details">
+                    <span class="tweet-detail">
+                        <i class="fa-solid fa-heart ${likeIconClass}"
+                        data-reply-like="${reply.uuid}"
+                        data-tweet-id="${tweet.uuid}"
+                        ></i>
+                        ${reply.likes}
+                    </span>
+                </div>
             </div>
         </div>
 </div>
